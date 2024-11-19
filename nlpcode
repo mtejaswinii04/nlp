@@ -1,0 +1,35 @@
+import numpy as np import pandas as pd
+from sklearn.model_selection import train_test_split from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report from transformers import BertTokenizer, BertModel
+import torch
+# Sample synthetic data: drug pairs and their synergy outcomes (1: synergistic, 0: non-synergistic) data = {
+'drug_1': ['DrugA', 'DrugB', 'DrugC', 'DrugD', 'DrugA', 'DrugB'],
+'drug_2': ['DrugB', 'DrugC', 'DrugD', 'DrugA', 'DrugD', 'DrugA'], 'synergy': [1, 0, 1, 0, 1, 0] # 1 = Synergistic, 0 = Non-synergistic
+}
+
+# Convert to DataFrame df = pd.DataFrame(data)
+
+# Initialize BERT tokenizer and model for drug name embeddings tokenizer = BertTokenizer.from_pretrained('bert-base-uncased') model = BertModel.from_pretrained('bert-base-uncased')
+def get_bert_embeddings(texts):
+"""Get BERT embeddings for a list of texts (drug names)."""
+inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=32) with torch.no_grad():
+outputs = model(**inputs)
+embeddings = outputs.last_hidden_state.mean(dim=1).numpy() # Average embedding for each input
+ 
+return embeddings
+
+# Prepare text pairs (drug_1 + drug_2) for embedding extraction drug_pairs = df['drug_1'] + " + " + df['drug_2'] drug_embeddings = get_bert_embeddings(drug_pairs.tolist())
+# Train/test split
+X_train, X_test, y_train, y_test = train_test_split(drug_embeddings, df['synergy'], test_size=0.3, random_state=42)
+# Train a machine learning model (Random Forest Classifier in this case) clf = RandomForestClassifier(n_estimators=100, random_state=42) clf.fit(X_train, y_train)
+
+# Make predictions
+y_pred = clf.predict(X_test)
+# Evaluate the model
+print("Accuracy:", accuracy_score(y_test, y_pred)) print("Classification Report:") print(classification_report(y_test, y_pred))
+
+# Example: Predict synergy for new drug pairs new_drug_pairs = ["DrugA + DrugC", "DrugB + DrugD"] new_embeddings = get_bert_embeddings(new_drug_pairs) predictions = clf.predict(new_embeddings)
+
+print("Predictions for new drug pairs:")
+for pair, prediction in zip(new_drug_pairs, predictions):
+print(f"{pair}: {'Synergistic' if prediction == 1 else 'Non-synergistic'}")
